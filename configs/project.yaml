@@ -1,0 +1,78 @@
+# ============================================================================
+# Computer Vision New — central project configuration
+# ----------------------------------------------------------------------------
+# All classes, paths, splits, thresholds and training parameters live here.
+# Code must read from this file; do not hardcode values in source files.
+# Values marked "placeholder" are defaults that later stages will override
+# through their own configuration (training, evaluation, augmentation).
+# ============================================================================
+
+project:
+  name: Computer Vision New
+  version: 0.1.0
+
+# Class definitions. Adding/removing classes only requires editing this list.
+# Model, annotation and evaluation logic derive num_classes from here.
+classes:
+  - id: 0
+    name: bell
+  - id: 1
+    name: oillamp
+
+paths:
+  # READ-ONLY source of truth for raw images. NEVER written to, renamed,
+  # resized or deleted by this application.
+  raw_data_dir: "D:/IEEE/100%Project/captured_photos"
+  # Everything the application generates lives inside the repository.
+  data_dir: data
+  manifests_dir: data/manifests
+  annotations_dir: data/annotations
+  datasets_dir: data/datasets
+  versions_dir: data/versions
+  augmented_dir: data/augmented
+  reports_dir: data/reports
+  models_dir: models
+  checkpoints_dir: models/checkpoints
+  registry_dir: models/registry
+  logs_dir: logs
+  baseline_file: configs/stage0_baseline.json
+
+image:
+  size: 640                # square input size for the detector (Stage 6+)
+
+split:                     # Stage 4 — deterministic original-image split
+  train_ratio: 0.70
+  validation_ratio: 0.15
+  test_ratio: 0.15
+  seed: 42
+  stratified: true
+
+training:                  # Stage 7 — from-scratch training (no pretrained weights)
+  epochs: 50
+  batch_size: 8
+  learning_rate: 0.001
+  num_workers: 0
+  seed: 42
+
+thresholds:                # inference post-processing
+  confidence: 0.25
+  nms: 0.45
+  iou: 0.50
+
+evaluation:                # Stage 8+ — metrics thresholds
+  iou_threshold: 0.50
+  # TARGETS are goals, never claims of achieved performance.
+  targets:
+    map: 0.95
+    f1: 0.95
+
+quality:                   # Stage 2 — image quality engine thresholds
+  min_blur_score: 50.0     # Laplacian variance below this = potentially blurry
+  min_brightness: 40.0     # mean grayscale below this = too dark
+  max_brightness: 220.0    # mean grayscale above this = too bright
+  min_width: 64
+  min_height: 64
+
+augmentation:              # Stage 5 — train-only augmentation
+  enabled: false
+  seed: 42

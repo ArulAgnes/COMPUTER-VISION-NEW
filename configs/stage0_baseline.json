@@ -1,0 +1,18 @@
+{
+  "source": "docs/DATA_AUDIT.md",
+  "stage": "Stage 0 raw dataset baseline",
+  "audited_at": "2026-10-06",
+  "note": "Measured facts from the read-only audit of the raw dataset. NOT training or evaluation results.",
+  "total_images": 26,
+  "class_counts": {
+    "bell": 13,
+    "oillamp": 13
+  },
+  "formats": {
+    "jpeg": 26
+  },
+  "corrupted_images": 0,
+  "unreadable_files": 0,
+  "exact_duplicate_groups": 0,
+  "suspicious_duplicate_pairs": 0
+}

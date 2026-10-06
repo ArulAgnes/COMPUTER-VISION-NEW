@@ -1,0 +1,47 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# ---- Environment & local files ----
+.env
+.env.local
+.env.*.local
+
+# ---- Logs ----
+logs/*
+!logs/.gitkeep
+*.log
+
+# ---- Generated data (large / reproducible artifacts) ----
+data/datasets/*
+!data/datasets/.gitkeep
+data/augmented/*
+!data/augmented/.gitkeep
+data/versions/*
+!data/versions/.gitkeep
+
+# ---- Model artifacts ----
+models/checkpoints/*
+!models/checkpoints/.gitkeep
+models/registry/*
+!models/registry/.gitkeep
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# NOTE: the raw dataset lives OUTSIDE this repository
+# (D:\IEEE\100%Project\captured_photos) and is read-only.
