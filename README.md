@@ -45,17 +45,21 @@ model version is actually better — with real measured metrics only.
   weights, no transfer learning, no COCO/ImageNet checkpoints.
 - Raw photos are **read-only**; everything generated lives inside this repository.
 
-## Current status — Stage 1
+## Current status — Stage 2
 
 Stages completed:
 
 - **Stage 0** — repository + read-only raw data audit (`docs/DATA_AUDIT.md`):
   26 JPEG images (13 `bell`, 13 `oillamp`), no corrupted files, no duplicates.
-- **Stage 1** — architecture + backend/frontend skeleton (this commit).
+- **Stage 1** — architecture + backend/frontend skeleton.
+- **Stage 2** — dataset discovery + image quality engine
+  (`docs/DATASET_DISCOVERY.md`, `docs/IMAGE_QUALITY.md`): reproducible
+  manifest, exact/near duplicate detection, real blur/brightness/resolution
+  measurements, dashboard pages (`/dataset`, `/quality`) and the
+  `python -m cvplatform` CLI.
 
-Not yet implemented (later stages): dataset discovery, quality engine,
-annotation, splitting, augmentation, training, evaluation, error analysis,
-diagnosis, inference, camera.
+Not yet implemented (later stages): annotation, splitting, augmentation,
+training, evaluation, error analysis, diagnosis, inference, camera.
 
 No model has been trained and **no evaluation metrics exist yet**.
 
@@ -78,6 +82,7 @@ COMPUTER-VISION-NEW/
 │   └── web/          Next.js dashboard
 ├── ai/               ML pipeline packages (model, training, evaluation, inference,
 │                     augmentation, annotation, dataset, diagnostics)
+├── cvplatform/       CLI (python -m cvplatform scan|quality)
 ├── data/             Generated manifests, annotations, datasets, versions, reports
 ├── models/           Checkpoints and model registry (generated)
 ├── scripts/          CLI entry points (later stages)
@@ -114,6 +119,9 @@ python -m uvicorn app.main:app --app-dir apps/api --reload
 
 # health check
 Invoke-RestMethod http://127.0.0.1:8000/api/health
+
+# dataset discovery + quality scan (also: POST /api/dataset/scan, or the UI)
+python -m cvplatform scan
 ```
 
 ### Frontend
@@ -166,4 +174,6 @@ for how the pieces fit together.
 ## Documentation
 
 - `docs/DATA_AUDIT.md` — Stage 0 baseline audit (measured facts)
+- `docs/DATASET_DISCOVERY.md` — Stage 2 manifest, duplicates, reproducibility
+- `docs/IMAGE_QUALITY.md` — Stage 2 measurements, flags, thresholds
 - `docs/ARCHITECTURE.md` — system architecture and conventions

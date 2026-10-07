@@ -45,3 +45,8 @@ Thumbs.db
 
 # NOTE: the raw dataset lives OUTSIDE this repository
 # (D:\IEEE\100%Project\captured_photos) and is read-only.
+
+data/manifests/*
+!data/manifests/.gitkeep
+data/reports/*
+!data/reports/.gitkeep

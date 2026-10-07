@@ -11,6 +11,7 @@ variables provide genuine environment-specific overrides only:
 from __future__ import annotations
 
 import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -20,6 +21,17 @@ from pydantic import BaseModel, Field, model_validator
 # apps/api/app/core/config.py -> parents: core, app, api, apps, repo root
 DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_CONFIG_FILE = "configs/project.yaml"
+
+# The backend runs with --app-dir apps/api, so make the repository root
+# importable to reach the shared `ai` package (engine used by CLI and API).
+if str(DEFAULT_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(DEFAULT_PROJECT_ROOT))
+
+from ai.dataset.settings import (  # noqa: E402
+    ClassDef,
+    DuplicateSettings,
+    QualitySettings,
+)
 
 
 class ProjectMeta(BaseModel):
@@ -110,20 +122,10 @@ class EvaluationConfig(BaseModel):
     targets: EvaluationTargets
 
 
-class QualityConfig(BaseModel):
-    """Image quality thresholds (Stage 2)."""
+class ApiConfig(BaseModel):
+    """API server settings (CORS origins for the local frontend)."""
 
-    min_blur_score: float = Field(ge=0)
-    min_brightness: float = Field(ge=0)
-    max_brightness: float = Field(gt=0)
-    min_width: int = Field(gt=0)
-    min_height: int = Field(gt=0)
-
-    @model_validator(mode="after")
-    def brightness_range_valid(self) -> "QualityConfig":
-        if self.min_brightness >= self.max_brightness:
-            raise ValueError("quality.min_brightness must be < quality.max_brightness")
-        return self
+    cors_origins: list[str]
 
 
 class AugmentationConfig(BaseModel):
@@ -144,7 +146,9 @@ class Settings(BaseModel):
     training: TrainingConfig
     thresholds: ThresholdsConfig
     evaluation: EvaluationConfig
-    quality: QualityConfig
+    quality: QualitySettings
+    duplicates: DuplicateSettings
+    api: ApiConfig
     augmentation: AugmentationConfig
 
     @model_validator(mode="after")
@@ -169,6 +173,10 @@ class Settings(BaseModel):
     @property
     def class_names(self) -> list[str]:
         return [c.name for c in sorted(self.classes, key=lambda c: c.id)]
+
+    def class_defs(self) -> list[ClassDef]:
+        """Class list in the form expected by the ``ai`` engine."""
+        return [ClassDef(id=c.id, name=c.name) for c in sorted(self.classes, key=lambda c: c.id)]
 
 
 def project_root() -> Path:

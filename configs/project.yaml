@@ -66,12 +66,40 @@ evaluation:                # Stage 8+ — metrics thresholds
     map: 0.95
     f1: 0.95
 
-quality:                   # Stage 2 — image quality engine thresholds
-  min_blur_score: 50.0     # Laplacian variance below this = potentially blurry
-  min_brightness: 40.0     # mean grayscale below this = too dark
-  max_brightness: 220.0    # mean grayscale above this = too bright
-  min_width: 64
-  min_height: 64
+quality:                   # Stage 2 — image quality engine (HEURISTICS, not ground truth)
+  min_width: 128           # flag images narrower than this
+  min_height: 128          # flag images shorter than this
+  blur:
+    method: laplacian_variance
+    review_threshold: 60.0 # blur_score below this -> blur_review flag
+    fail_threshold: 15.0   # blur_score below this -> blur_fail flag
+  brightness:
+    dark_threshold: 45.0   # mean grayscale below this -> too_dark
+    bright_threshold: 210.0 # mean grayscale above this -> too_bright
+  aspect_ratio:
+    min: 0.4               # width/height outside [min, max] -> extreme_aspect_ratio
+    max: 2.5
+  status_rules:            # flags -> overall quality_status (FAIL > REVIEW > PASS)
+    fail_flags: [decode_failed, blur_fail]
+    review_flags:
+      - blur_review
+      - low_resolution
+      - too_dark
+      - too_bright
+      - extreme_aspect_ratio
+      - exact_duplicate
+      - suspicious_duplicate
+
+duplicates:                # Stage 2 — duplicate detection methods
+  near_duplicate:
+    enabled: true
+    method: dhash_hamming  # 64-bit difference hash, Hamming distance
+    max_hamming_distance: 6
+
+api:                       # CORS for the local frontend dev server
+  cors_origins:
+    - http://localhost:3000
+    - http://127.0.0.1:3000
 
 augmentation:              # Stage 5 — train-only augmentation
   enabled: false

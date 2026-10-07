@@ -75,7 +75,19 @@ split: {train_ratio: 0.9, validation_ratio: 0.05, test_ratio: 0.02, seed: 1, str
 training: {epochs: 1, batch_size: 1, learning_rate: 0.001, num_workers: 0, seed: 1}
 thresholds: {confidence: 0.25, nms: 0.45, iou: 0.5}
 evaluation: {iou_threshold: 0.5, targets: {map: null, f1: null}}
-quality: {min_blur_score: 50, min_brightness: 40, max_brightness: 220, min_width: 64, min_height: 64}
+quality:
+  min_width: 128
+  min_height: 128
+  blur: {method: laplacian_variance, review_threshold: 60.0, fail_threshold: 15.0}
+  brightness: {dark_threshold: 45.0, bright_threshold: 210.0}
+  aspect_ratio: {min: 0.4, max: 2.5}
+  status_rules:
+    fail_flags: [decode_failed, blur_fail]
+    review_flags: [blur_review, low_resolution, too_dark, too_bright, extreme_aspect_ratio, exact_duplicate, suspicious_duplicate]
+duplicates:
+  near_duplicate: {enabled: true, method: dhash_hamming, max_hamming_distance: 6}
+api:
+  cors_origins: ["http://localhost:3000"]
 augmentation: {enabled: false, seed: 1}
 """,
         encoding="utf-8",
@@ -90,3 +102,19 @@ def test_duplicate_class_ids_rejected() -> None:
     data["classes"] = [{"id": 0, "name": "bell"}, {"id": 0, "name": "oillamp"}]
     with pytest.raises(ValidationError):
         type(settings).model_validate(data)
+
+
+def test_quality_and_api_sections_loaded() -> None:
+    settings = get_settings()
+    assert settings.quality.blur.method == "laplacian_variance"
+    assert settings.quality.blur.fail_threshold <= settings.quality.blur.review_threshold
+    assert settings.quality.brightness.dark_threshold < settings.quality.brightness.bright_threshold
+    assert "decode_failed" in settings.quality.status_rules.fail_flags
+    assert settings.duplicates.near_duplicate.max_hamming_distance <= 64
+    assert settings.api.cors_origins, "at least one frontend origin must be configured"
+
+
+def test_class_defs_match_classes() -> None:
+    settings = get_settings()
+    defs = settings.class_defs()
+    assert [(d.id, d.name) for d in defs] == [(c.id, c.name) for c in settings.classes]

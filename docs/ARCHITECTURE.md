@@ -1,7 +1,9 @@
 # Architecture
 
-**Stage 1 baseline.** This document describes the structure of
-Computer Vision New and the conventions later stages must follow.
+**Stage 2.** This document describes the structure of Computer Vision New and
+the conventions later stages must follow. Updated for Stage 2: dataset
+discovery + image quality engine (`docs/DATASET_DISCOVERY.md`,
+`docs/IMAGE_QUALITY.md`).
 
 ## Overview
 
@@ -9,21 +11,21 @@ Computer Vision New and the conventions later stages must follow.
 ┌──────────────────────┐        HTTP (JSON)        ┌──────────────────────┐
 │  apps/web            │ ────────────────────────► │  apps/api            │
 │  Next.js dashboard   │  /api/health              │  FastAPI             │
-│  React + TS + TW4    │  /api/config              │  config / status /   │
-│                      │  /api/status              │  future pipeline ops │
+│  React + TS + TW4    │  /api/config  /api/status │  config / status /   │
+│                      │  /api/dataset/* (Stage 2) │  dataset ops         │
 └──────────────────────┘                           └──────────┬───────────┘
-                                                              │ imports
-                                                   ┌──────────▼───────────┐
-                                                   │  ai/  packages       │
-                                                   │  dataset, annotation │
-                                                   │  model, training …   │
-                                                   └──────────┬───────────┘
-                                    reads (never writes)      │ writes
-                     ┌──────────────────────┐        ┌────────▼────────────┐
-                     │ RAW DATA (external)  │        │ GENERATED (in repo) │
-                     │ captured_photos\     │        │ data/, models/,     │
-                     │  bell, oillamp       │        │ logs/               │
-                     └──────────────────────┘        └─────────────────────┘
+        ▲                                                     │ imports
+        │ CLI: python -m cvplatform scan|quality       ┌──────▼───────────┐
+        │ (same engine, same config)                   │  ai/  packages   │
+        └─────────────────────────────────────────────►│  dataset (Stage 2)│
+                                                       │  annotation …     │
+                                                       └──────────┬───────┘
+                                     reads (never writes)        │ writes
+                      ┌──────────────────────┐        ┌──────────▼─────────┐
+                      │ RAW DATA (external)  │        │ GENERATED (in repo) │
+                      │ captured_photos\     │        │ data/, models/,     │
+                      │  bell, oillamp       │        │ logs/               │
+                      └──────────────────────┘        └─────────────────────┘
 ```
 
 ## Frontend — `apps/web`
@@ -33,9 +35,10 @@ Computer Vision New and the conventions later stages must follow.
   and the main content area.
 - Navigation is centralized in `lib/navigation.ts` — adding a section means
   adding one entry there.
-- `app/page.tsx` (Dashboard) and `app/settings/page.tsx` are client components
-  that fetch real data from the API; unknown sections fall through to
-  `app/[section]/page.tsx` (server component, real HTTP 404 via `notFound()`).
+- `app/page.tsx` (Dashboard), `app/settings/page.tsx`, `app/dataset/page.tsx`
+  and `app/quality/page.tsx` are client components that fetch real data from
+  the API; unknown sections fall through to `app/[section]/page.tsx`
+  (server component, real HTTP 404 via `notFound()`).
 - `lib/api.ts` holds the typed API client and the honest formatting helpers
   (`valueOrNA`, `formatMetric`): `null` renders as **Not available**.
 - UI conventions: dark professional theme, no decorative animations, no invented
@@ -46,15 +49,16 @@ Computer Vision New and the conventions later stages must follow.
 ```text
 apps/api/
 ├── app/
-│   ├── main.py            application factory (create_app), lifespan, error handlers
-│   ├── api/routes/        health.py, config.py, status.py (+ later routes)
+│   ├── main.py            application factory (create_app), lifespan, CORS, error handlers
+│   ├── api/routes/        health.py, config.py, status.py, dataset.py
 │   ├── core/
-│   │   ├── config.py      YAML loading + validation (pydantic), env overrides
+│   │   ├── config.py      YAML loading + validation (pydantic), env overrides,
+│   │   │                  sys.path bootstrap so the API can import the shared ai/ engine
 │   │   ├── paths.py       path resolution + RAW-DATA write protection
 │   │   └── logging.py     structured logging (stdout + logs/api.log)
-│   ├── schemas/           response models (health, config, status, common errors)
-│   └── services/          status_service.py (+ later pipeline services)
-└── tests/                 pytest suite (TestClient)
+│   ├── schemas/           response models (health, config, status, dataset, common errors)
+│   └── services/          status_service.py, dataset_service.py
+└── tests/                 pytest suite (TestClient + engine tests)
 ```
 
 Run: `python -m uvicorn app.main:app --app-dir apps/api --reload`
@@ -74,8 +78,17 @@ Failures return a standard envelope:
 | `GET /api/health` | Real service status (name, version, configured classes) |
 | `GET /api/config` | Public configuration (classes, split, thresholds, targets) |
 | `GET /api/status` | Dashboard status: Stage 0 baseline + pipeline values (`null` until produced) |
+| `POST /api/dataset/scan` | Run discovery + quality analysis (read-only on raw data) |
+| `GET /api/dataset/summary` | Manifest summary: counts, classes, duplicates (404 `DATASET_NOT_SCANNED` before the first scan) |
+| `GET /api/dataset/images` | Paginated manifest records, joined with quality status; `class_name` / `quality_status` filters |
+| `GET /api/dataset/images/{id}` | One record + its quality analysis (absolute paths never exposed) |
+| `GET /api/dataset/images/{id}/thumbnail` | In-memory JPEG thumbnail from the read-only source |
+| `GET /api/dataset/quality` | Quality report: summary, flagged images, thresholds applied |
 
-Later stages add: dataset scan/quality, annotations, split, augmentation,
+CORS origins for the local frontend come from `api.cors_origins` in
+`configs/project.yaml`.
+
+Later stages add: annotations, split, augmentation,
 dataset versions, training, evaluation, errors/diagnosis/recommendations,
 inference.
 
@@ -116,7 +129,12 @@ image processing and training utilities — the weights themselves start random.
 - `paths` — raw data dir (read-only) + generated dirs (relative to repo root)
 - `image.size`, `split` (ratios, seed, stratified), `training`, `thresholds`
 - `evaluation.iou_threshold` and `evaluation.targets` (goals, not results)
-- `quality` thresholds (Stage 2), `augmentation` (Stage 5)
+- `quality` thresholds + `duplicates` near-duplicate settings (Stage 2),
+  `api.cors_origins`, `augmentation` (Stage 5)
+
+The `quality` / `duplicates` schema is defined once in `ai/dataset/settings.py`
+and imported by `app/core/config.py`, so the CLI, the API and the engine share
+identical models.
 
 Environment variables are used only for genuine environment differences:
 
@@ -170,7 +188,6 @@ versions. Seeds come from config (`split.seed`, `training.seed`,
 ## Planned API surface (later stages)
 
 ```text
-POST /api/dataset/scan          GET  /api/dataset            GET /api/dataset/quality
 GET/POST/PUT/DELETE /api/annotations...
 POST /api/dataset/split         POST /api/dataset/augment
 GET  /api/datasets/versions     GET  /api/datasets/versions/{id}
